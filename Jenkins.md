@@ -27,8 +27,8 @@
       node(POD_LABEL) {
         stage('Build Docker image') {
             git branch: 'master',
-                credentialsId: '926e3fd5-4505-4633-b953-1aaf54307e8a',
-                url: 'git@git.clever-age.net:easycash/infra-cloud.git'
+                credentialsId: 'jenkins-credential',
+                url: 'git-url-here'
             container('docker') {
                 sh "docker build --network host ./Docker/php"
             }

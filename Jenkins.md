@@ -23,7 +23,6 @@
     """
       ) {
     
-      def image = "jenkins/jnlp-slave"
       node(POD_LABEL) {
         stage('Build Docker image') {
             git branch: 'master',

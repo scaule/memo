@@ -2,35 +2,42 @@
 
     helm install jenkins 
 
-**Docker in docker (docker not found)** 
+**Docker in docker (docker not found) with kubectl and helm** 
 
-    podTemplate(yaml: """
-    apiVersion: v1
-    kind: Pod
-    spec:
-      containers:
-      - name: docker
-        image: docker:latest
-        command: ['cat']
-        tty: true
-        volumeMounts:
-        - name: dockersock
-          mountPath: /var/run/docker.sock
-      volumes:
-      - name: dockersock
-        hostPath:
-          path: /var/run/docker.sock
-    """
-      ) {
-    
+    def POD_LABEL = "worker-${UUID.randomUUID().toString()}"
+
+    podTemplate(label: POD_LABEL, containers: [
+      containerTemplate(name: 'docker', image: 'docker', command: 'cat', ttyEnabled: true),
+      containerTemplate(name: 'kubectl', image: 'lachlanevenson/k8s-kubectl:v1.8.8', command: 'cat', ttyEnabled: true),
+      containerTemplate(name: 'helm', image: 'alpine/helm:latest', command: 'cat', ttyEnabled: true)
+    ],
+    volumes: [
+      hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock')
+    ]) {
+
+      def String GIT_HASH
+
       node(POD_LABEL) {
+        echo "Will deploy branch ${params.BRANCH}"
         stage('Build Docker image') {
-            git branch: 'master',
-                credentialsId: 'jenkins-credential',
-                url: 'git-url-here'
+            git branch: "master",
+                credentialsId: 'Jenkins-gitlab',
+                url: 'HERE_GIT_REMOTE_URL'
+            sshagent (credentials: ['Jenkins-gitlab']) {            
+                GIT_HASH = sh(script: "git ls-remote HERE_GIT_REMOTE_URL ${params.BRANCH} | awk '{ print \$1}'", returnStdout: true).trim()
+            }        
             container('docker') {
-                sh "docker build --network host ./Docker/php"
+                  docker.withRegistry('ECR_URL', 'ecr:eu-west-3:JENKINS_CREDENTIAL_ID') {
+                    sh "docker build --build-arg BRANCH=${params.BRANCH} --no-cache	--network host ./Docker/php-front -t front:${GIT_HASH}"
+                    docker.image("front:${GIT_HASH}").push()
+                  }
             }
+        }
+        stage('Run helm') {
+          container('helm') {
+            sh "sed -i 's/appVersion:.*/appVersion: ${GIT_HASH}/g' ./K8s/Helm/front/Chart.yaml"
+            sh "helm upgrade -i front ./K8s/Helm/front"
+          }
         }
       }
     }

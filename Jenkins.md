@@ -41,7 +41,9 @@
         }
       }
     }
-
+**PUsefull plugins**
+    - agent ssh
+    - Amazon ecr
 **Push to ECR**
 
 Create credentials in jenkins from aws : [https://console.aws.amazon.com/iam/home#/users](https://console.aws.amazon.com/iam/home#/users)
